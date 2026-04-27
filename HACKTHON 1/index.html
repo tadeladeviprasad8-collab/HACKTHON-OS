@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en" class="light"> <head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Memory Allocation Visualizer — Home</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    // On page load, check for previously saved theme and apply it
+    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+      document.documentElement.classList.remove('light');
+    } else {
+      document.documentElement.classList.remove('dark');
+      document.documentElement.classList.add('light');
+    }
+  </script>
+
+  <style>
+    :root {
+      --card-radius: 18px;
+    }
+
+    /* Light Theme */
+    .light .bg-pastel {
+      background: linear-gradient(135deg, #fffaf0 0%, #f8f0ff 40%, #f0fbff 100%);
+      background-size: 200% 200%;
+      animation: gentleShift 14s ease-in-out infinite;
+    }
+    .light .glass {
+      background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.75));
+      backdrop-filter: blur(8px);
+      border-radius: var(--card-radius);
+      box-shadow: 0 8px 30px rgba(16,24,40,0.06);
+    }
+    .light .study-item { background: linear-gradient(90deg,#fff,#fff); border-radius: 12px; }
+
+
+    /* Dark Theme */
+    .dark {
+        --tw-bg-opacity: 1;
+        background-color: rgb(23 23 35 / var(--tw-bg-opacity)); /* Darker background */
+        color: #e2e8f0; /* Light text */
+    }
+
+    .dark .bg-pastel { /* Dark theme background */
+        background: linear-gradient(135deg, #1A202C 0%, #2D3748 50%, #1A202C 100%);
+        background-size: 200% 200%;
+        animation: gentleShift 14s ease-in-out infinite;
+    }
+    .dark .glass { /* Dark theme glass effect */
+        background: linear-gradient(180deg, rgba(30, 41, 59, 0.85), rgba(30, 41, 59, 0.75));
+        backdrop-filter: blur(8px);
+        border-radius: var(--card-radius);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.4);
+        border: 1px solid rgba(63, 79, 107, 0.3);
+    }
+    .dark .text-slate-800 { color: #e2e8f0; } /* Adjust main text color */
+    .dark .text-slate-600 { color: #cbd5e1; } /* Adjust secondary text color */
+    .dark .text-pink-600 { color: #f87171; } /* Adjust accent color for dark theme */
+    .dark .text-slate-700 { color: #e2e8f0; }
+    .dark .card-hover:hover { box-shadow: 0 18px 40px rgba(0,0,0,0.3); }
+    .dark .modal-bg { background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); }
+    .dark .study-item { background: rgba(30, 41, 59, 0.9); }
+    .dark .study-item summary { color: #e2e8f0; }
+    .dark .study-item div { color: #cbd5e1; }
+    .dark .bg-white { background-color: #1a202c; } /* Adjust specific white elements */
+    .dark .bg-white\/90 { background-color: rgba(30, 41, 59, 0.9); }
+    .dark input, .dark textarea, .dark select {
+        background-color: #2D3748;
+        border-color: #4A5568;
+        color: #e2e8f0;
+    }
+    .dark input::placeholder, .dark textarea::placeholder { color: #a0aec0; }
+    .dark .bg-gray-50 { background-color: #2D3748; border-color: #4A5568; }
+
+    @keyframes gentleShift {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .floaty { animation: floaty 6s ease-in-out infinite; transform-origin: center; }
+    @keyframes floaty {
+      0% { transform: translateY(0px); }
+      50% { transform: translateY(-8px) rotate(-0.5deg); }
+      100% { transform: translateY(0px); }
+    }
+
+    .card-hover { transition: transform .35s cubic-bezier(.2,.9,.3,1), box-shadow .35s; }
+    .card-hover:hover { transform: translateY(-8px) scale(1.01); box-shadow: 0 18px 40px rgba(34,24,48,0.12); }
+
+
+    /* Custom class for image styling - ensures object-cover is used for all */
+    .visualizer-img { object-fit: cover; }
+  </style>
+</head>
+
+<body class="bg-pastel min-h-screen text-slate-800 antialiased">
+  <header class="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <div class="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-pink-100 to-purple-100 shadow">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+          <path d="M3 12h18" stroke="#D946EF" stroke-width="1.6" stroke-linecap="round"/>
+          <path d="M6 5v14" stroke="#7C3AED" stroke-width="1.6" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-2xl font-semibold text-slate-800">Memory Allocation Visualizer</h1>
+        <p class="text-sm text-slate-600">Paging · Segmentation · Heap (First/Best/Buddy)</p>
+      </div>
+    </div>
+    <button id="themeToggle" class="p-2 rounded-full bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 shadow-md">
+        <svg id="sunIcon" class="w-6 h-6 hidden dark:block" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h1M2 12h1m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+        <svg id="moonIcon" class="w-6 h-6 block dark:hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+    </button>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-6 pb-12">
+    <section class="grid lg:grid-cols-2 gap-8 items-center">
+      <div class="space-y-6">
+        <h2 class="text-4xl lg:text-5xl font-extrabold text-slate-800 leading-tight">Learn & Visualize how memory is allocated — <span class="text-pink-600">with clarity</span>.</h2>
+        <p class="text-slate-600 max-w-xl">Interactive, educational simulations for Paging, Segmentation and Heap allocation. Click a topic to start simulation or quick study.</p>
+
+        <div class="flex flex-wrap gap-3 mt-4">
+          <a href="paging.html" target="_blank" class="px-4 py-2 rounded-full bg-pink-200 text-pink-800 font-medium hover:scale-105 transition dark:bg-pink-800 dark:text-pink-200">Start Paging</a>
+          <a href="segmentation.html" target="_blank" class="px-4 py-2 rounded-full bg-rose-100 text-rose-800 font-medium hover:scale-105 transition dark:bg-rose-800 dark:text-rose-200">Start Segmentation</a>
+          <a href="heap.html" target="_blank" class="px-4 py-2 rounded-full bg-indigo-100 text-indigo-700 font-medium hover:scale-105 transition dark:bg-indigo-800 dark:text-indigo-200">Start Heap</a>
+        </div>
+      </div>
+
+      <aside class="grid grid-cols-2 gap-3">
+        <div class="glass w-full h-44 rounded-2xl floaty shadow p-3 flex items-center justify-center relative">
+            <h4 class="text-slate-700 font-medium z-10">Paging Diagram</h4>
+            <svg class="absolute w-1/2 h-1/2 opacity-20 text-pink-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect></svg>
+        </div>
+        <div class="glass w-full h-44 rounded-2xl floaty shadow p-3 flex items-center justify-center relative">
+            <h4 class="text-slate-700 font-medium z-10">Segmentation Diagram</h4>
+            <svg class="absolute w-1/2 h-1/2 opacity-20 text-rose-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l8 4v8l-8 4l-8-4V6l8-4z"></path><path d="M12 22v-6l8-4"></path><path d="M12 22v-6l-8-4"></path></svg>
+        </div>
+        <div class="glass w-full h-44 rounded-2xl floaty shadow p-3 flex items-center justify-center relative">
+            <h4 class="text-slate-700 font-medium z-10">Buddy Heap Diagram</h4>
+            <svg class="absolute w-1/2 h-1/2 opacity-20 text-indigo-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        </div>
+        <div class="glass w-full h-44 rounded-2xl floaty shadow p-3 flex items-center justify-center relative">
+            <h4 class="text-slate-700 font-medium z-10">Virtual Memory Mapping</h4>
+            <svg class="absolute w-1/2 h-1/2 opacity-20 text-purple-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="15" rx="2" ry="2"></rect><polyline points="17 2 12 7 7 2"></polyline></svg>
+        </div>
+      </aside>
+    </section>
+
+    <section class="mt-12">
+      <h3 class="text-xl font-semibold mb-6 text-slate-800">Topics</h3>
+      <div class="grid md:grid-cols-3 gap-6">
+        
+        <article class="glass p-4 rounded-2xl overflow-hidden card-hover">
+          <div class="w-full h-40 bg-gradient-to-br from-pink-50 to-purple-100 dark:from-pink-800 dark:to-purple-800 rounded-xl mb-4 flex items-center justify-center">
+            <svg class="w-16 h-16 text-pink-500 opacity-60 dark:text-pink-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+            </svg>
+          </div>
+          <h4 class="font-semibold text-slate-800">Paging</h4>
+          <p class="text-sm text-slate-600 mt-1">Fixed-size pages & frames. See how logical pages map to physical frames.</p>
+          <div class="mt-4 flex gap-3">
+            <button onclick="window.open('paging.html','_blank')" class="px-3 py-2 rounded-full bg-pink-100 text-pink-700 text-sm dark:bg-pink-800 dark:text-pink-200">Start Simulation</button>
+            <button onclick="openLearn('paging')" class="px-3 py-2 rounded-full bg-white/90 text-slate-700 text-sm dark:bg-slate-700 dark:text-slate-200">Learn About It</button>
+          </div>
+        </article>
+
+        <article class="glass p-4 rounded-2xl overflow-hidden card-hover">
+          <div class="w-full h-40 bg-gradient-to-br from-rose-50 to-orange-100 dark:from-rose-800 dark:to-orange-800 rounded-xl mb-4 flex items-center justify-center">
+              <svg class="w-16 h-16 text-rose-500 opacity-60 dark:text-rose-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M12 2l8 4v8l-8 4l-8-4V6l8-4z"></path>
+                  <path d="M12 22v-6l8-4"></path>
+                  <path d="M12 22v-6l-8-4"></path>
+              </svg>
+          </div>
+          <h4 class="font-semibold text-slate-800">Segmentation</h4>
+          <p class="text-sm text-slate-600 mt-1">Variable-length segments like code, stack and data — see allocation visually.</p>
+          <div class="mt-4 flex gap-3">
+            <button onclick="window.open('segmentation.html','_blank')" class="px-3 py-2 rounded-full bg-rose-100 text-rose-700 text-sm dark:bg-rose-800 dark:text-rose-200">Start Simulation</button>
+            <button onclick="openLearn('segmentation')" class="px-3 py-2 rounded-full bg-white/90 text-slate-700 text-sm dark:bg-slate-700 dark:text-slate-200">Learn About It</button>
+          </div>
+        </article>
+
+        <article class="glass p-4 rounded-2xl overflow-hidden card-hover">
+          <div class="w-full h-40 bg-gradient-to-br from-indigo-50 to-blue-100 dark:from-indigo-800 dark:to-blue-800 rounded-xl mb-4 flex items-center justify-center">
+              <svg class="w-16 h-16 text-indigo-500 opacity-60 dark:text-indigo-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                  <circle cx="9" cy="7" r="4"></circle>
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+              </svg>
+          </div>
+          <h4 class="font-semibold text-slate-800">Heap Management</h4>
+          <p class="text-sm text-slate-600 mt-1">First Fit, Best Fit, Buddy System — visualize malloc/free and fragmentation.</p>
+          <div class="mt-4 flex gap-3">
+            <button onclick="window.open('heap.html','_blank')" class="px-3 py-2 rounded-full bg-indigo-100 text-indigo-700 text-sm dark:bg-indigo-800 dark:text-indigo-200">Start Simulation</button>
+            <button onclick="openLearn('heap')" class="px-3 py-2 rounded-full bg-white/90 text-slate-700 text-sm dark:bg-slate-700 dark:text-slate-200">Learn About It</button>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="study" class="mt-12 bg-white/80 glass p-6 rounded-2xl">
+      <h3 class="text-2xl font-semibold mb-4 text-slate-800">Study Hub</h3>
+      <p class="text-sm text-slate-600 mb-4">Quick summaries and examples for each topic.</p>
+
+      <div class="space-y-3">
+        <details class="study-item p-4">
+          <summary class="font-medium cursor-pointer text-slate-700">📘 Paging — What & Why</summary>
+          <div class="mt-3 text-sm text-slate-700">
+            <p><b>Idea:</b> Logical memory divided into fixed-size pages; physical memory into equal-sized frames.</p>
+            <p class="mt-2"><b>Example:</b> If page size = 4KB and process = 10KB, it occupies 3 pages. Page table maps each page → frame.</p>
+          </div>
+        </details>
+
+        <details class="study-item p-4">
+          <summary class="font-medium cursor-pointer text-slate-700">📗 Segmentation — What & Why</summary>
+          <div class="mt-3 text-sm text-slate-700">
+            <p><b>Idea:</b> Divide memory based on logical sections like Code, Stack, and Data. Each has different length.</p>
+            <p class="mt-2">It allows easier sharing and protection but may cause external fragmentation.</p>
+          </div>
+        </details>
+
+        <details class="study-item p-4">
+          <summary class="font-medium cursor-pointer text-slate-700">📙 Heap Allocation — Strategies</summary>
+          <div class="mt-3 text-sm text-slate-700">
+            <p><b>First Fit:</b> Allocate first suitable free block.</p>
+            <p><b>Best Fit:</b> Allocate smallest possible free block.</p>
+            <p><b>Buddy System:</b> Split memory blocks in powers of two for easier merging and splitting.</p>
+          </div>
+        </details>
+      </div>
+    </section>
+
+    <footer class="mt-12 text-center text-sm text-slate-600">
+      © 2025 Memory Allocation Visualizer
+    </footer>
+  </main>
+
+  <div id="learnModal" class="fixed inset-0 hidden items-center justify-center modal-bg z-40">
+    <div class="max-w-2xl w-full p-6 bg-white rounded-2xl shadow-lg dark:bg-slate-800">
+      <button onclick="closeLearn()" class="text-slate-500 dark:text-slate-400 float-right">Close ✕</button>
+      <div id="learnContent" class="mt-2 text-slate-700 dark:text-slate-200"></div>
+    </div>
+  </div>
+
+  <script>
+    const modal = document.getElementById('learnModal');
+    const content = document.getElementById('learnContent');
+
+    function openLearn(topic) {
+      const data = {
+        paging: `<h3 class="text-lg font-semibold">Paging — Quick Summary</h3>
+        <p class="mt-2 text-sm">Pages are fixed-size logical blocks. Frames are equal physical blocks. Page table maps them.</p>
+        <p class="mt-3"><a href='paging.html' target='_blank' class='text-pink-600 dark:text-pink-400'>Open Paging Simulator →</a></p>`,
+        segmentation: `<h3 class="text-lg font-semibold">Segmentation — Quick Summary</h3>
+        <p class="mt-2 text-sm">Memory divided into segments like code, stack, data. Each has variable length.</p>
+        <p class="mt-3"><a href='segmentation.html' target='_blank' class='text-rose-600 dark:text-rose-400'>Open Segmentation Simulator →</a></p>`,
+        heap: `<h3 class="text-lg font-semibold">Heap Allocation — Quick Summary</h3>
+        <p class="mt-2 text-sm">Dynamic allocation using First Fit, Best Fit or Buddy system strategies.</p>
+        <p class="mt-3"><a href='heap.html' target='_blank' class='text-indigo-600 dark:text-indigo-400'>Open Heap Simulator →</a></p>`
+      };
+      content.innerHTML = data[topic];
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+    }
+
+    function closeLearn() {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+    }
+
+    // Theme Toggle Logic
+    const themeToggle = document.getElementById('themeToggle');
+    themeToggle.addEventListener('click', () => {
+      if (document.documentElement.classList.contains('dark')) {
+        document.documentElement.classList.remove('dark');
+        document.documentElement.classList.add('light');
+        localStorage.setItem('theme', 'light');
+      } else {
+        document.documentElement.classList.remove('light');
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('theme', 'dark');
+      }
+    });
+  </script>
+</body>
+</html>
+
+
+
+

@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>Segmentation Simulation — Simplified</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --card-radius: 18px;
+        }
+        .bg-pastel {
+            background: linear-gradient(135deg, #fffaf0 0%, #f8f0ff 40%, #f0fbff 100%);
+            background-size: 200% 200%;
+            animation: gentleShift 14s ease-in-out infinite;
+        }
+        @keyframes gentleShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .glass {
+            background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.75));
+            backdrop-filter: blur(8px);
+            border-radius: var(--card-radius);
+            box-shadow: 0 8px 30px rgba(16,24,40,0.06);
+        }
+    </style>
+</head>
+
+<body class="bg-pastel min-h-screen text-slate-800 antialiased">
+    <header class="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-rose-100 to-orange-100 shadow">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2l8 4v8l-8 4l-8-4V6l8-4z" stroke="#F43F5E" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-2xl font-semibold text-slate-800">Segmentation Simulation (Simplified)</h1>
+                <p class="text-sm text-slate-600">Segment and Offset to Physical Address Translation</p>
+            </div>
+        </div>
+        <a href="index.html" class="px-4 py-2 rounded-full bg-rose-500 text-white font-medium hover:bg-rose-600 transition">← Back to Topics</a>
+    </header>
+
+    <hr class="max-w-6xl mx-auto border-rose-200">
+
+    <main class="max-w-6xl mx-auto px-6 pb-12 grid lg:grid-cols-3 gap-8 pt-8">
+        <div class="lg:col-span-1 space-y-6">
+            <h2 class="text-2xl font-bold text-rose-600">⚙️ Settings</h2>
+            
+            <div class="glass p-6 space-y-4">
+                <p class="font-medium">1. Segment Table (Limit & Base)</p>
+                <p class="text-sm text-slate-600">Format: **SegmentID:Limit:Base**</p>
+                <textarea id="segTableInput" rows="5" class="w-full p-2 border rounded-lg font-mono text-sm focus:ring-rose-500 focus:border-rose-500" placeholder="0:1000:5000\n1:2000:10000\n2:500:8000">0:1000:5000
+1:2000:10000
+2:500:8000</textarea>
+                <p class="text-xs text-slate-500">Example: `0:1000:5000` (Seg 0 has size 1000, starts at physical address 5000).</p>
+            </div>
+
+            <div class="glass p-6 space-y-4">
+                <p class="font-medium">2. Logical Address (S, D)</p>
+                <input type="number" id="segmentID" value="1" min="0" class="w-full p-2 border rounded-lg focus:ring-rose-500 focus:border-rose-500" placeholder="Segment ID (S)">
+                <input type="number" id="offset" value="1500" min="0" class="w-full p-2 border rounded-lg focus:ring-rose-500 focus:border-rose-500" placeholder="Offset (D)">
+            </div>
+
+            <button onclick="translateSegmentAddress()" class="w-full py-3 bg-rose-500 text-white font-bold rounded-xl shadow-lg hover:bg-rose-600 transition">
+                🚀 Translate Address
+            </button>
+        </div>
+        
+        <div class="lg:col-span-2 space-y-6">
+            <h2 class="text-2xl font-bold text-slate-800">🎯 Translation Result</h2>
+
+            <div id="resultOutput" class="glass p-6 space-y-4 min-h-[300px]">
+                <p class="text-slate-500">Enter parameters and click **'Translate Address'** to see the steps.</p>
+            </div>
+
+            <div class="glass p-6">
+                <h3 class="font-semibold mb-3">Simple Mapping Visualization:</h3>
+                <div id="visualization" class="p-4 bg-gray-50 border border-gray-200 rounded-lg min-h-[150px] flex flex-col justify-center items-center text-center">
+                    <p class="text-sm text-slate-600">The Logical Address will be mapped to a Physical Address here.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="mt-12 text-center text-sm text-slate-600">
+        © 2025 Memory Allocation Visualizer · Segmentation Module
+    </footer>
+
+    <script>
+        function translateSegmentAddress() {
+            const segmentID = parseInt(document.getElementById('segmentID').value);
+            const offset = parseInt(document.getElementById('offset').value);
+            const tableInput = document.getElementById('segTableInput').value;
+            const output = document.getElementById('resultOutput');
+            const visual = document.getElementById('visualization');
+            
+            output.innerHTML = '';
+            visual.innerHTML = '';
+
+            // 1. Validate LA Inputs
+            if (isNaN(segmentID) || segmentID < 0 || isNaN(offset) || offset < 0) {
+                output.innerHTML = '<p class="text-red-500 font-bold">Error: Please enter valid positive numbers for Segment ID and Offset.</p>';
+                return;
+            }
+
+            // 2. Parse Segment Table
+            const segTable = {};
+            const tableLines = tableInput.trim().split('\n');
+
+            tableLines.forEach(line => {
+                const parts = line.split(':').map(p => p.trim());
+                if (parts.length === 3) {
+                    const id = parseInt(parts[0]);
+                    const limit = parseInt(parts[1]);
+                    const base = parseInt(parts[2]);
+                    if (!isNaN(id) && !isNaN(limit) && !isNaN(base)) {
+                        segTable[id] = { limit, base };
+                    }
+                }
+            });
+
+            // 3. Check for Segment Existence (Segment Fault)
+            const segment = segTable[segmentID];
+            if (!segment) {
+                output.innerHTML = `<p class="text-red-500 font-bold text-xl">❌ SEGMENTATION FAULT!</p>
+                    <p class="mt-2">Segment ID **${segmentID}** is not defined in the Segment Table.</p>`;
+                visual.innerHTML = `<p class="text-xl font-bold text-red-500">SEGMENT FAULT</p>`;
+                return;
+            }
+
+            // 4. Check for Offset Validity (Limit Check)
+            if (offset >= segment.limit) {
+                output.innerHTML = `<p class="text-red-500 font-bold text-xl">❌ SEGMENTATION FAULT (Limit Check)!</p>
+                    <p class="mt-2">Requested offset **${offset}** is greater than or equal to the Segment Limit (**${segment.limit}**).</p>`;
+                visual.innerHTML = `<p class="text-xl font-bold text-red-500">LIMIT ERROR</p>`;
+                return;
+            }
+
+            // 5. Calculate Physical Address (PA)
+            const physicalAddress = segment.base + offset;
+            
+            // --- OUTPUT DISPLAY ---
+
+            output.innerHTML = `
+                <p class="text-lg font-bold text-rose-500">Address Translation Complete!</p>
+                <hr class="my-2 border-rose-200">
+                
+                <h3 class="font-semibold text-slate-700">Segment Lookup:</h3>
+                <p class="ml-4 font-mono text-sm">Segment **${segmentID}** has Limit = **${segment.limit}** and Base = **${segment.base}**</p>
+                
+                <h3 class="font-semibold text-slate-700 mt-4">Step 1: Check Offset vs. Limit</h3>
+                <p class="ml-4 font-mono text-sm">Is Offset (${offset}) < Limit (${segment.limit})? <span class="text-green-600 font-bold">YES</span></p>
+
+                <h3 class="font-semibold text-slate-700 mt-4">Step 2: Calculate Physical Address (PA)</h3>
+                <p class="ml-4 font-mono text-sm">PA = Base + Offset</p>
+                <p class="ml-4 font-mono text-sm">PA = **${segment.base}** + **${offset}** = 
+                    <span class="text-green-600 font-bold text-xl">${physicalAddress}</span></p>
+            `;
+
+            // --- SIMPLE VISUALIZATION ---
+            visual.innerHTML = `
+                <div class="flex items-center space-x-4">
+                    <p class="text-xl font-semibold text-rose-600">LA: (Seg ${segmentID}, Offset ${offset})</p>
+                    <svg class="w-6 h-6 text-rose-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
+                    <p class="text-2xl font-extrabold text-green-600">PA: ${physicalAddress}</p>
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
+

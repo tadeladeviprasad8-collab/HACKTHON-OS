@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Paging Simulation — Simplified</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <style>
+        :root {
+            --card-radius: 18px;
+        }
+
+        .bg-pastel {
+            background: linear-gradient(135deg, #fffaf0 0%, #f8f0ff 40%, #f0fbff 100%);
+            background-size: 200% 200%;
+            animation: gentleShift 14s ease-in-out infinite;
+        }
+        @keyframes gentleShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .glass {
+            background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.75));
+            backdrop-filter: blur(8px);
+            border-radius: var(--card-radius);
+            box-shadow: 0 8px 30px rgba(16,24,40,0.06);
+        }
+    </style>
+</head>
+
+<body class="bg-pastel min-h-screen text-slate-800 antialiased">
+    <header class="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-pink-100 to-purple-100 shadow">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                    <path d="M3 12h18" stroke="#D946EF" stroke-width="1.6" stroke-linecap="round"/>
+                    <path d="M6 5v14" stroke="#7C3AED" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-2xl font-semibold text-slate-800">Paging Simulation (Simplified)</h1>
+                <p class="text-sm text-slate-600">Logical Address to Physical Address Translation</p>
+            </div>
+        </div>
+        <a href="index.html" class="px-4 py-2 rounded-full bg-pink-500 text-white font-medium hover:bg-pink-600 transition">← Back to Topics</a>
+    </header>
+
+    ---
+
+    <main class="max-w-6xl mx-auto px-6 pb-12 grid lg:grid-cols-3 gap-8">
+        <div class="lg:col-span-1 space-y-6">
+            <h2 class="text-2xl font-bold text-pink-600">⚙️ Settings</h2>
+            
+            <div class="glass p-6 space-y-4">
+                <p class="font-medium">1. Set Page Size</p>
+                <input type="number" id="pageSize" value="1024" min="16" step="16" class="w-full p-2 border rounded-lg focus:ring-pink-500 focus:border-pink-500" placeholder="e.g., 1024 (Bytes)">
+                <p class="text-xs text-slate-500">Must be a power of 2 for real systems, but we'll use it directly here for simplicity.</p>
+            </div>
+
+            <div class="glass p-6 space-y-4">
+                <p class="font-medium">2. Page Table (Page → Frame)</p>
+                <p class="text-sm text-slate-600">Example: Page 0 maps to Frame 5, Page 1 to Frame 12...</p>
+                <textarea id="pageTableInput" rows="5" class="w-full p-2 border rounded-lg font-mono text-sm focus:ring-pink-500 focus:border-pink-500" placeholder="0:5\n1:12\n2:6\n3:1\n4:10">0:5
+1:12
+2:6
+3:1
+4:10</textarea>
+                <p class="text-xs text-slate-500">Format: `Page:Frame`, separated by new lines.</p>
+            </div>
+
+            <div class="glass p-6 space-y-4">
+                <p class="font-medium">3. Logical Address</p>
+                <input type="number" id="logicalAddress" value="3000" min="0" class="w-full p-2 border rounded-lg focus:ring-pink-500 focus:border-pink-500" placeholder="e.g., 3000">
+            </div>
+
+            <button onclick="translateAddress()" class="w-full py-3 bg-pink-500 text-white font-bold rounded-xl shadow-lg hover:bg-pink-600 transition">
+                🚀 Translate Address
+            </button>
+        </div>
+        
+        <div class="lg:col-span-2 space-y-6">
+            <h2 class="text-2xl font-bold text-slate-800">🎯 Translation Result</h2>
+
+            <div id="resultOutput" class="glass p-6 space-y-4 min-h-[300px]">
+                <p class="text-slate-500">Enter parameters and click 'Translate Address' to see the steps.</p>
+            </div>
+
+            <div class="glass p-6">
+                <h3 class="font-semibold mb-3">Visualization Map:</h3>
+                <div id="visualization" class="p-4 bg-gray-50 border border-gray-200 rounded-lg min-h-[150px] flex flex-col justify-center items-center text-center">
+                    <p class="text-sm text-slate-600">The Logical Address will be mapped to a Physical Frame here.</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <footer class="mt-12 text-center text-sm text-slate-600">
+        © 2025 Memory Allocation Visualizer · Paging Module
+    </footer>
+
+    <script>
+        function translateAddress() {
+            const pageSize = parseInt(document.getElementById('pageSize').value);
+            const logicalAddress = parseInt(document.getElementById('logicalAddress').value);
+            const tableInput = document.getElementById('pageTableInput').value;
+            const output = document.getElementById('resultOutput');
+            const visual = document.getElementById('visualization');
+            
+            output.innerHTML = '';
+            visual.innerHTML = '';
+
+            // 1. Validate Inputs
+            if (isNaN(pageSize) || pageSize <= 0 || isNaN(logicalAddress) || logicalAddress < 0) {
+                output.innerHTML = '<p class="text-red-500 font-bold">Error: Please enter valid positive numbers for Page Size and Logical Address.</p>';
+                return;
+            }
+
+            // 2. Parse Page Table
+            const pageTable = {};
+            const tableLines = tableInput.trim().split('\n');
+            let maxPageNumber = -1;
+
+            tableLines.forEach(line => {
+                const parts = line.split(':').map(p => p.trim());
+                if (parts.length === 2) {
+                    const page = parseInt(parts[0]);
+                    const frame = parseInt(parts[1]);
+                    if (!isNaN(page) && !isNaN(frame) && page >= 0 && frame >= 0) {
+                        pageTable[page] = frame;
+                        maxPageNumber = Math.max(maxPageNumber, page);
+                    }
+                }
+            });
+
+            if (Object.keys(pageTable).length === 0) {
+                output.innerHTML = '<p class="text-red-500 font-bold">Error: Page Table format is invalid. Use Page:Frame format.</p>';
+                return;
+            }
+
+            // --- PAGING MATH ---
+            
+            // 3. Calculate Page Number (P) and Offset (D)
+            const pageNumber = Math.floor(logicalAddress / pageSize);
+            const offset = logicalAddress % pageSize;
+
+            // 4. Check for Address Validity (Page Fault)
+            if (pageNumber > maxPageNumber) {
+                output.innerHTML = `<p class="text-red-500 font-bold text-xl">❌ PAGE FAULT!</p>
+                    <p class="mt-2">Logical Address (${logicalAddress}) falls outside the defined Page Table range.</p>
+                    <p class="text-sm text-slate-600">Page number ${pageNumber} is not in the Page Table (Max Page: ${maxPageNumber}).</p>`;
+                visual.innerHTML = `<p class="text-xl font-bold text-red-500">PAGE FAULT</p>`;
+                return;
+            }
+
+            const frameNumber = pageTable[pageNumber];
+
+            // 5. Calculate Physical Address (PA)
+            const physicalAddress = (frameNumber * pageSize) + offset;
+            
+            // --- OUTPUT DISPLAY ---
+
+            output.innerHTML = `
+                <p class="text-lg font-bold text-pink-500">Address Translation Complete!</p>
+                <hr class="my-2 border-pink-200">
+                <h3 class="font-semibold text-slate-700">Step 1: Calculate Page Number and Offset</h3>
+                <p class="ml-4 font-mono text-sm">P (Page) = Floor(${logicalAddress} / ${pageSize}) = 
+                    <span class="text-pink-600 font-bold">${pageNumber}</span></p>
+                <p class="ml-4 font-mono text-sm">D (Offset) = ${logicalAddress} % ${pageSize} = 
+                    <span class="text-pink-600 font-bold">${offset}</span></p>
+
+                <h3 class="font-semibold text-slate-700 mt-4">Step 2: Lookup Frame Number (F)</h3>
+                <p class="ml-4 font-mono text-sm">Page Table Lookup: Page ${pageNumber} maps to Frame 
+                    <span class="text-purple-600 font-bold">${frameNumber}</span></p>
+                
+                <h3 class="font-semibold text-slate-700 mt-4">Step 3: Calculate Physical Address (PA)</h3>
+                <p class="ml-4 font-mono text-sm">PA = (F * PageSize) + D</p>
+                <p class="ml-4 font-mono text-sm">PA = (${frameNumber} * ${pageSize}) + ${offset} = 
+                    <span class="text-green-600 font-bold text-xl">${physicalAddress}</span></p>
+            `;
+
+            // --- SIMPLE VISUALIZATION ---
+            visual.innerHTML = `
+                <p class="text-lg font-semibold text-slate-700">Logical Address: <span class="text-pink-600">${logicalAddress}</span></p>
+                <p class="text-xl font-bold mt-2">Mapped to:</p>
+                <p class="text-2xl font-extrabold text-green-600 mt-1">Frame ${frameNumber} @ Address ${physicalAddress}</p>
+            `;
+        }
+    </script>
+</body>
+</html>
+

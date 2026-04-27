@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+    <title>Heap Simulation — Simplified</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --card-radius: 18px;
+        }
+        .bg-pastel {
+            background: linear-gradient(135deg, #fffaf0 0%, #f8f0ff 40%, #f0fbff 100%);
+            background-size: 200% 200%;
+            animation: gentleShift 14s ease-in-out infinite;
+        }
+        @keyframes gentleShift {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .glass {
+            background: linear-gradient(180deg, rgba(255,255,255,0.85), rgba(255,255,255,0.75));
+            backdrop-filter: blur(8px);
+            border-radius: var(--card-radius);
+            box-shadow: 0 8px 30px rgba(16,24,40,0.06);
+        }
+        .highlight {
+            border-color: #4f46e5;
+            background-color: #eef2ff;
+            box-shadow: 0 0 0 3px #c7d2fe;
+            font-weight: bold;
+        }
+    </style>
+</head>
+
+<body class="bg-pastel min-h-screen text-slate-800 antialiased">
+
+    <header class="max-w-6xl mx-auto px-6 py-6 flex items-center justify-between">
+        <div class="flex items-center gap-4">
+            <div class="w-12 h-12 rounded-xl flex items-center justify-center bg-gradient-to-br from-indigo-100 to-purple-100 shadow">
+                <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+                    <circle cx="9" cy="7" r="4" stroke="#6366f1" stroke-width="1.6" stroke-linecap="round"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-2xl font-semibold text-slate-800">Heap Simulation (Simplified)</h1>
+                <p class="text-sm text-slate-600">Allocation Rules: First Fit, Best Fit, Buddy System</p>
+            </div>
+        </div>
+        <a href="index.html" class="px-4 py-2 rounded-full bg-indigo-500 text-white font-medium hover:bg-indigo-600 transition">← Back to Topics</a>
+    </header>
+
+    <hr class="max-w-6xl mx-auto border-indigo-200">
+
+    <main class="max-w-6xl mx-auto px-6 pb-12 grid lg:grid-cols-3 gap-8 pt-8">
+        <div class="lg:col-span-1 space-y-6">
+            <h2 class="text-2xl font-bold text-indigo-600">⚙️ Settings</h2>
+            
+            <div class="glass p-6 space-y-4">
+                <p class="font-medium">1. Define Available Free Blocks (KB)</p>
+                <p class="text-sm text-slate-600">Enter sizes of free blocks, separated by commas.</p>
+                <input id="freeBlocksInput" type="text" value="100, 500, 200, 75, 400" class="w-full p-2 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500 font-mono text-sm" placeholder="e.g., 100, 500, 200">
+            </div>
+
+            <div class="glass p-6 space-y-4">
+                <p class="font-medium">2. Choose Strategy</p>
+                <select id="strategy" class="w-full p-2 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500">
+                    <option value="first">First Fit</option>
+                    <option value="best">Best Fit</option>
+                    <option value="buddy">Buddy System</option>
+                </select>
+            </div>
+
+            <div class="glass p-6 space-y-4">
+                <p class="font-medium">3. Process Size to Allocate (KB)</p>
+                <input id="procSize" type="number" min="1" value="150" class="w-full p-2 border rounded-lg focus:ring-indigo-500 focus:border-indigo-500" placeholder="e.g., 150">
+            </div>
+
+            <button onclick="allocateProcessSimplified()" class="w-full py-3 bg-indigo-500 text-white font-bold rounded-xl shadow-lg hover:bg-indigo-600 transition">
+                🔎 Find Allocation Block
+            </button>
+        </div>
+
+        <div class="lg:col-span-2 space-y-6">
+            <h2 class="text-2xl font-bold text-slate-800">🎯 Allocation Decision</h2>
+
+            <div id="resultOutput" class="glass p-6 space-y-4 min-h-[150px]">
+                <p class="text-slate-500">Define free blocks and process size, then click **'Find Allocation Block'**.</p>
+            </div>
+
+            <div class="glass p-6">
+                <h3 class="font-semibold mb-3">Current Free Blocks (KB):</h3>
+                <div id="blockList" class="mt-2 flex flex-wrap gap-3">
+                    </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="mt-12 text-center text-sm text-slate-600">
+        © 2025 Memory Allocation Visualizer · Heap Module
+    </footer>
+
+    <script>
+        function nextPowerOfTwo(n) {
+            // Helper function to calculate the smallest power of 2 >= n
+            if (n <= 1) return 1;
+            let p = 1;
+            while (p < n) {
+                p *= 2;
+            }
+            return p;
+        }
+
+        function renderBlocks(freeBlocks, chosenIndex = -1) {
+            const blockListEl = document.getElementById('blockList');
+            blockListEl.innerHTML = '';
+
+            freeBlocks.forEach((size, index) => {
+                const blockDiv = document.createElement('div');
+                blockDiv.className = `p-3 rounded-xl border border-gray-300 transition w-32 text-center font-medium`;
+                
+                if (index === chosenIndex) {
+                    blockDiv.classList.add('highlight');
+                    blockDiv.innerHTML = `✅ **${size} KB**<br><span class="text-xs text-indigo-700">CHOSEN</span>`;
+                } else {
+                    blockDiv.innerHTML = `${size} KB`;
+                }
+                blockListEl.appendChild(blockDiv);
+            });
+        }
+
+        function allocateProcessSimplified() {
+            const procSize = parseInt(document.getElementById('procSize').value);
+            const strategy = document.getElementById('strategy').value;
+            const blocksInput = document.getElementById('freeBlocksInput').value;
+            const output = document.getElementById('resultOutput');
+            
+            output.innerHTML = '';
+
+            // 1. Validate Input
+            if (isNaN(procSize) || procSize <= 0) {
+                output.innerHTML = '<p class="text-red-500 font-bold">Error: Please enter a valid positive Process Size.</p>';
+                return;
+            }
+
+            // 2. Parse Free Blocks
+            const freeBlocks = blocksInput.split(',')
+                                          .map(s => parseInt(s.trim()))
+                                          .filter(n => !isNaN(n) && n > 0);
+            
+            if (freeBlocks.length === 0) {
+                output.innerHTML = '<p class="text-red-500 font-bold">Error: Define free blocks (e.g., 100, 500).</p>';
+                return;
+            }
+
+            let chosenIndex = -1;
+            let bestSize = Infinity;
+            let requiredAllocationSize = procSize;
+
+            // --- ALLOCATION LOGIC ---
+
+            if (strategy === 'first') {
+                // First Fit: Find the first block large enough.
+                chosenIndex = freeBlocks.findIndex(size => size >= procSize);
+
+                if (chosenIndex !== -1) {
+                    output.innerHTML = `
+                        <h3 class="font-semibold text-slate-700">Strategy: First Fit</h3>
+                        <p class="mt-2 text-md">The process needs **${procSize} KB**.</p>
+                        <p class="mt-2 text-lg text-green-600 font-bold">Block Chosen: The first available block (${freeBlocks[chosenIndex]} KB).</p>
+                        <p class="text-sm text-slate-600">Fragmentation: **${freeBlocks[chosenIndex] - procSize} KB** remaining in the block.</p>
+                    `;
+                }
+            } 
+            else if (strategy === 'best') {
+                // Best Fit: Find the smallest block large enough.
+                freeBlocks.forEach((size, index) => {
+                    if (size >= procSize) {
+                        const difference = size - procSize;
+                        if (difference < bestSize) {
+                            bestSize = difference;
+                            chosenIndex = index;
+                        }
+                    }
+                });
+
+                if (chosenIndex !== -1) {
+                    output.innerHTML = `
+                        <h3 class="font-semibold text-slate-700">Strategy: Best Fit</h3>
+                        <p class="mt-2 text-md">The process needs **${procSize} KB**.</p>
+                        <p class="mt-2 text-lg text-green-600 font-bold">Block Chosen: The block that fits best (${freeBlocks[chosenIndex]} KB).</p>
+                        <p class="text-sm text-slate-600">Fragmentation: **${freeBlocks[chosenIndex] - procSize} KB** remaining (Internal Fragmentation minimized).</p>
+                    `;
+                }
+            } 
+            else if (strategy === 'buddy') {
+                // Buddy System: Find the smallest power-of-two block that is >= needed size.
+                requiredAllocationSize = nextPowerOfTwo(procSize);
+                let bestBuddySize = Infinity;
+
+                freeBlocks.forEach((size, index) => {
+                    if (size >= requiredAllocationSize) {
+                        if (size < bestBuddySize) {
+                            bestBuddySize = size;
+                            chosenIndex = index;
+                        }
+                    }
+                });
+
+                if (chosenIndex !== -1) {
+                    output.innerHTML = `
+                        <h3 class="font-semibold text-slate-700">Strategy: Buddy System</h3>
+                        <p class="mt-2 text-md">Process needs **${procSize} KB**. Buddy requires a block of size **${requiredAllocationSize} KB** (Next power of 2).</p>
+                        <p class="mt-2 text-lg text-green-600 font-bold">Block Chosen: ${freeBlocks[chosenIndex]} KB.</p>
+                        <p class="text-sm text-slate-600">Total Fragmentation (Internal): **${requiredAllocationSize - procSize} KB** from rounding up.</p>
+                    `;
+                }
+            }
+
+            if (chosenIndex === -1) {
+                let failMessage = `No free block is large enough to satisfy the **${procSize} KB** request.`;
+                if (strategy === 'buddy') {
+                    failMessage = `Buddy System requires a block of **${requiredAllocationSize} KB**. No free block is large enough.`;
+                }
+                output.innerHTML = `<p class="text-red-500 font-bold text-xl">❌ ALLOCATION FAILED!</p>
+                                    <p class="mt-2">${failMessage}</p>`;
+            }
+
+            // 3. Render Blocks with highlight
+            renderBlocks(freeBlocks, chosenIndex);
+        }
+
+        // Initial render
+        document.addEventListener('DOMContentLoaded', () => {
+            const initialBlocks = document.getElementById('freeBlocksInput').value.split(',').map(s => parseInt(s.trim())).filter(n => !isNaN(n) && n > 0);
+            renderBlocks(initialBlocks);
+        });
+    </script>
+</body>
+</html>
